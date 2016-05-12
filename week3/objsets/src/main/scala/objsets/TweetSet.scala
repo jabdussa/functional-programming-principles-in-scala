@@ -35,6 +35,7 @@ class Tweet(val user: String, val text: String, val retweets: Int) {
  */
 abstract class TweetSet {
 
+  def updateAccumulator[T](p: Tweet => Boolean, acc: T, accUpdateFunction: (T, Tweet) => T, predUpdateFunc: T => Tweet => Boolean): T
   /**
    * This method takes a predicate and returns a subset of all the elements
    * in the original set for which the predicate is true.
@@ -42,12 +43,15 @@ abstract class TweetSet {
    * Question: Can we implment this method here, or should it remain abstract
    * and be implemented in the subclasses?
    */
-    def filter(p: Tweet => Boolean): TweetSet = filterAcc(p, new Empty)
-  
+    //def filter(p: Tweet => Boolean): TweetSet = filterAcc(p, new Empty)
+  def filter(p: Tweet => Boolean): TweetSet
+
   /**
    * This is a helper method for `filter` that propagetes the accumulated tweets.
    */
+  /*
   def filterAcc(p: Tweet => Boolean, acc: TweetSet): TweetSet
+  */
 
   /**
    * Returns a new `TweetSet` that is the union of `TweetSet`s `this` and `that`.
@@ -68,7 +72,7 @@ abstract class TweetSet {
    */
     def mostRetweeted: Tweet
 
-    def mostRetweetedAcc(acc: Tweet): Tweet
+    //def mostRetweetedAcc(acc: Tweet): Tweet
   
   /**
    * Returns a list containing all tweets of this set, sorted by retweet count
@@ -111,11 +115,16 @@ abstract class TweetSet {
 }
 
 class Empty extends TweetSet {
+  /*
     def filterAcc(p: Tweet => Boolean, acc: TweetSet): TweetSet = acc
-  
+  */
   /**
    * The following methods are already implemented
    */
+
+  def updateAccumulator[T](p: Tweet => Boolean, acc: T, accUpdateFunction: (T, Tweet) => T, predUpdateFunc: T => Tweet => Boolean): T = acc
+
+  def filter(p: Tweet => Boolean): TweetSet = this
 
   def contains(tweet: Tweet): Boolean = false
 
@@ -123,9 +132,13 @@ class Empty extends TweetSet {
 
   def union(that: TweetSet): TweetSet = that
 
+
+
   def mostRetweeted: Tweet = throw new NoSuchElementException("Empty cannot contain a most retweeted element")
 
-  def mostRetweetedAcc(acc: Tweet): Tweet = acc
+
+  //def mostRetweetedAcc(acc: Tweet): Tweet = acc
+
 
   def remove(tweet: Tweet): TweetSet = this
 
@@ -135,10 +148,21 @@ class Empty extends TweetSet {
 }
 
 class NonEmpty(elem: Tweet, left: TweetSet, right: TweetSet) extends TweetSet {
-
+  /*
     def filterAcc(p: Tweet => Boolean, acc: TweetSet): TweetSet = 
       if (p(elem)) right.filterAcc(p, left.filterAcc(p, acc.incl(elem)))
       else right.filterAcc(p, left.filterAcc(p, acc))
+  */
+
+  def updateAccumulator[T](p: Tweet => Boolean, acc: T, accUpdateFunction: (T, Tweet) => T, predUpdateFunc: T => Tweet => Boolean): T =
+    if (p(elem)) {
+      val updatedAcc = left.updateAccumulator(predUpdateFunc(accUpdateFunction(acc, elem)), accUpdateFunction(acc, elem), accUpdateFunction, predUpdateFunc)
+      right.updateAccumulator(predUpdateFunc(updatedAcc), updatedAcc, accUpdateFunction, predUpdateFunc)
+    }
+    else right.updateAccumulator(p, left.updateAccumulator(p, acc, accUpdateFunction, predUpdateFunc), accUpdateFunction, predUpdateFunc)
+
+  def filter(p: Tweet => Boolean): TweetSet =
+    updateAccumulator(p, new Empty, (x: TweetSet, y: Tweet) => x incl y, (y: TweetSet) => (x: Tweet) => p(x))
 
   /**
    * The following methods are already implemented
@@ -156,13 +180,20 @@ class NonEmpty(elem: Tweet, left: TweetSet, right: TweetSet) extends TweetSet {
   }
 
   def union(that: TweetSet): TweetSet = left.union(right).union(that) incl elem
-
+/*
   def mostRetweetedAcc(acc: Tweet): Tweet =
     if (elem.retweets > acc.retweets) right.mostRetweetedAcc(left.mostRetweetedAcc(elem))
     else right.mostRetweetedAcc(left.mostRetweetedAcc(acc))
 
   def mostRetweeted: Tweet =
     mostRetweetedAcc(new Tweet("user", "text", -1))
+
+  */
+
+    def mostRetweeted: Tweet =	{
+      val initialAcc = new Tweet("user", "text", -1)
+      updateAccumulator((x: Tweet) => x.retweets > initialAcc.retweets, initialAcc, (x: Tweet, y: Tweet) => y, (y: Tweet) => (x: Tweet) => x.retweets > y.retweets)
+    }
 
   def descendingByRetweet: TweetList = {
     val tweet = mostRetweeted
