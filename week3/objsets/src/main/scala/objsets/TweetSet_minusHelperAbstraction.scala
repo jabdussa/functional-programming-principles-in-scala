@@ -4,6 +4,7 @@ import common._
 import TweetReader._
 
 /**
+  * Author: Coursera
  * A class to represent tweets.
  */
 class Tweet(val user: String, val text: String, val retweets: Int) {
@@ -14,13 +15,12 @@ class Tweet(val user: String, val text: String, val retweets: Int) {
 
 /**
   * Author: Emily Chen
-  * I implement subclasses of this class by abstracting
-  * logic for its `filter` and `mostRetweeted` methods
-  * into a single helper method, instead of defining
-  * distinct helper methods (i.e. `filterAcc` and `mostRetweetedAcc`)
-  * with nearly identical implementations.
+  * I implement subclasses of this class by writing
+  * separate helper methods for its `filter` and `mostRetweeted`
+  * methods, named `filterAcc` and `mostRetweetedAcc`.
   *
- * Author: Coursera Instructors
+ *
+  * Author: Coursera
   * This represents a set of objects of type `Tweet` in the form of a binary search
  * tree. Every branch in the tree has two children (two `TweetSet`s). There is an
  * invariant which always holds: for every branch `b`, all elements in the left
@@ -44,23 +44,17 @@ class Tweet(val user: String, val text: String, val retweets: Int) {
 abstract class TweetSet {
 
 /**
-    * Author: Emily Chen
-    * This is a helper method for this class' methods: `filter` and `mostRetweets`.
-    * Originally, I implemented separate helper methods for each,
-    * named `filterAcc` and `mostRetweetedAcc`.
-    * Their implementations were nearly identical, so I decided to
-    * to abstract them into a single helper method as an exercise
-    * in writing higher-order functions.
-    */
-  def updateAccumulator[T](p: Tweet => Boolean, acc: T, accUpdateFunction: (T, Tweet) => T, predUpdateFunc: T => Tweet => Boolean): T
-
-
-  /**
-   * This method takes a predicate and returns a subset of all the elements
+   * Author: Emily Chen
+  * This method takes a predicate and returns a subset of all the elements
    * in the original set for which the predicate is true.
    */
 
-  def filter(p: Tweet => Boolean): TweetSet
+  def filter(p: Tweet => Boolean): TweetSet = filterAcc(p, new Empty)
+
+  /**
+   * This is a helper method for `filter` that propagates the accumulated tweets.
+   */
+  def filterAcc(p: Tweet => Boolean, acc: TweetSet): TweetSet
 
   /**
    * Returns a new `TweetSet` that is the union of `TweetSet`s `this` and `that`.
@@ -73,6 +67,11 @@ abstract class TweetSet {
     def mostRetweeted: Tweet
 
   /**
+    * This is a helper method for `mostRetweeted`.
+    */
+    def mostRetweetedAcc(acc: Tweet): Tweet
+  
+  /**
    * Returns a list containing all tweets of this set, sorted by retweet count
    * in descending order. In other words, the head of the resulting list should
    * have the highest retweet count.
@@ -81,7 +80,7 @@ abstract class TweetSet {
 
 
   /**
-   * The following methods are already implemented
+   * The following methods are already implemented by the Coursera instructors.
    */
 
   /**
@@ -109,16 +108,10 @@ abstract class TweetSet {
 }
 
 class Empty extends TweetSet {
-
   /**
     * Author: Emily Chen
     */
-  def updateAccumulator[T](p: Tweet => Boolean, acc: T, accUpdateFunction: (T, Tweet) => T, predUpdateFunc: T => Tweet => Boolean): T = acc
-
-  /**
-    * Author: Emily Chen
-    */
-  def filter(p: Tweet => Boolean): TweetSet = this
+  def filterAcc(p: Tweet => Boolean, acc: TweetSet): TweetSet = acc
 
   /**
     * Author: Emily Chen
@@ -132,12 +125,19 @@ class Empty extends TweetSet {
 
   /**
     * Author: Emily Chen
+    * Notice the similarity in the implementation of
+    * this class' `filterAcc` method.
+    */
+  def mostRetweetedAcc(acc: Tweet): Tweet = acc
+
+  /**
+    * Author: Emily Chen
     */
   def descendingByRetweet: TweetList = Nil
 
 
   /**
-   * The following methods are already implemented
+   * The following methods are already implemented by the Coursera instructors.
    */
 
   def contains(tweet: Tweet): Boolean = false
@@ -150,16 +150,12 @@ class Empty extends TweetSet {
 }
 
 class NonEmpty(elem: Tweet, left: TweetSet, right: TweetSet) extends TweetSet {
-
   /**
     * Author: Emily Chen
     */
-  def updateAccumulator[T](p: Tweet => Boolean, acc: T, accUpdateFunction: (T, Tweet) => T, predUpdateFunc: T => Tweet => Boolean): T =
-    if (p(elem)) {
-      val updatedAcc = left.updateAccumulator(predUpdateFunc(accUpdateFunction(acc, elem)), accUpdateFunction(acc, elem), accUpdateFunction, predUpdateFunc)
-      right.updateAccumulator(predUpdateFunc(updatedAcc), updatedAcc, accUpdateFunction, predUpdateFunc)
-    }
-    else right.updateAccumulator(p, left.updateAccumulator(p, acc, accUpdateFunction, predUpdateFunc), accUpdateFunction, predUpdateFunc)
+    def filterAcc(p: Tweet => Boolean, acc: TweetSet): TweetSet = 
+      if (p(elem)) right.filterAcc(p, left.filterAcc(p, acc.incl(elem)))
+      else right.filterAcc(p, left.filterAcc(p, acc))
 
   /**
     * Author: Emily Chen
@@ -174,11 +170,18 @@ class NonEmpty(elem: Tweet, left: TweetSet, right: TweetSet) extends TweetSet {
 
   /**
     * Author: Emily Chen
+    * Note the similarity of this method's implementation
+    * to the implementation of this class' `filterAcc` method.
     */
-  def mostRetweeted: Tweet =	{
-    val initialAcc = new Tweet("user", "text", -1)
-    updateAccumulator((x: Tweet) => x.retweets > initialAcc.retweets, initialAcc, (x: Tweet, y: Tweet) => y, (y: Tweet) => (x: Tweet) => x.retweets > y.retweets)
-  }
+  def mostRetweetedAcc(acc: Tweet): Tweet =
+    if (elem.retweets > acc.retweets) right.mostRetweetedAcc(left.mostRetweetedAcc(elem))
+    else right.mostRetweetedAcc(left.mostRetweetedAcc(acc))
+
+  /**
+    * Author: Emily Chen
+    */
+  def mostRetweeted: Tweet =
+    mostRetweetedAcc(new Tweet("user", "text", -1))
 
   /**
     * Author: Emily Chen
@@ -190,7 +193,7 @@ class NonEmpty(elem: Tweet, left: TweetSet, right: TweetSet) extends TweetSet {
 
 
   /**
-   * The following methods are already implemented
+   * The following methods are already implemented by the Coursera instructors.
    */
 
   def contains(x: Tweet): Boolean =
